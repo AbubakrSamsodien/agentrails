@@ -326,7 +326,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 
@@ -351,7 +350,6 @@ dev = [
     "pytest-asyncio==1.3.0",
     "pytest-cov==7.1.0",
     "ruff==0.15.8",
-    "ty==0.0.27",
     "pylint==4.0.5",
     "vulture==2.16",
     "rich==14.3.3",
@@ -405,7 +403,7 @@ paths = ["agentrails/"]
 packages = ["agentrails"]
 ```
 
-**Note:** `uv` is used as the package manager and build tool instead of pip. The `ty` type checker was removed from the pipeline in 2026-04-02 due to unresolved issues with optional imports and asyncio.gather return types. ruff + pylint provide comprehensive linting coverage.
+**Note:** `uv` is used as the package manager and build tool instead of pip. The `ty` type checker was removed from the pipeline in Sprint 6 (2026-04-03) due to unresolved issues with optional imports and asyncio.gather return types. ruff + pylint provide comprehensive linting coverage.
 
 #### Makefile
 
