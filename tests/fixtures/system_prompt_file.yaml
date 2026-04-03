@@ -1,0 +1,8 @@
+name: system_prompt_file_test
+
+steps:
+  - id: plan
+    type: agent
+    prompt: "Create a plan for the feature"
+    system_prompt_file: "prompts/architect.md"
+    output_format: json

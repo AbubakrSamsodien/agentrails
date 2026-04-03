@@ -1,0 +1,22 @@
+name: parallel_test
+steps:
+  - id: setup
+    type: shell
+    script: "echo setup"
+  - id: tests
+    type: parallel_group
+    depends_on: [setup]
+    branches:
+      - id: unit
+        type: shell
+        script: "echo unit"
+      - id: integration
+        type: shell
+        script: "echo integration"
+      - id: lint
+        type: shell
+        script: "echo lint"
+  - id: deploy
+    type: shell
+    script: "echo deploy"
+    depends_on: [tests]

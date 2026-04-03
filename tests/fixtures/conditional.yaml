@@ -1,0 +1,19 @@
+name: conditional_test
+steps:
+  - id: check
+    type: shell
+    script: "echo check"
+  - id: branch
+    type: conditional
+    depends_on: [check]
+    if: "{{state.check.return_code == 0}}"
+    then: [success_path]
+    else: [failure_path]
+  - id: success_path
+    type: shell
+    depends_on: [branch]
+    script: "echo success"
+  - id: failure_path
+    type: shell
+    depends_on: [branch]
+    script: "echo failure"

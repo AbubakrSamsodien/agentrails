@@ -1,0 +1,14 @@
+name: loop_test
+steps:
+  - id: setup
+    type: shell
+    script: "echo setup"
+  - id: retry
+    type: loop
+    depends_on: [setup]
+    max_iterations: 3
+    until: "{{state.retry.latest.return_code == 0}}"
+    body:
+      - id: attempt
+        type: shell
+        script: "echo attempt"

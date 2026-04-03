@@ -1,0 +1,15 @@
+# NOTE: Requires Claude CLI to be installed and configured (ANTHROPIC_API_KEY)
+name: simple_linear
+steps:
+  - id: plan
+    type: agent
+    prompt: "Create a plan for implementing a new feature"
+    output_format: json
+  - id: implement
+    type: agent
+    prompt: "Implement the plan: {{state.plan.result}}"
+    depends_on: [plan]
+  - id: test
+    type: shell
+    script: "pytest -q"
+    depends_on: [implement]

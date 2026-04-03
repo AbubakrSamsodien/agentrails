@@ -1,0 +1,13 @@
+name: linear_test
+steps:
+  - id: step1
+    type: shell
+    script: "echo step1"
+  - id: step2
+    type: shell
+    script: "echo step2"
+    depends_on: [step1]
+  - id: step3
+    type: shell
+    script: "echo step3"
+    depends_on: [step2]

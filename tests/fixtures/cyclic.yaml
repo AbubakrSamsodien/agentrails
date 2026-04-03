@@ -1,0 +1,14 @@
+name: cyclic_invalid
+steps:
+  - id: a
+    type: shell
+    script: "echo a"
+    depends_on: [c]
+  - id: b
+    type: shell
+    script: "echo b"
+    depends_on: [a]
+  - id: c
+    type: shell
+    script: "echo c"
+    depends_on: [b]

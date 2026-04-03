@@ -1,0 +1,387 @@
+"""Tests for AgentStep class."""
+
+from unittest.mock import AsyncMock
+
+import pytest
+
+from agentrails.state import WorkflowState
+from agentrails.steps.agent_step import AgentStep
+from agentrails.steps.base import ExecutionContext
+
+
+def test_agent_step_initialization():
+    """Test AgentStep can be initialized."""
+    step = AgentStep(id="test", prompt="Hello")
+    assert step.id == "test"
+    assert step.prompt == "Hello"
+    assert step.type == "agent"
+
+
+def test_agent_step_with_all_fields():
+    """Test AgentStep with all optional fields."""
+    step = AgentStep(
+        id="plan",
+        prompt="Create a plan",
+        system_prompt="You are helpful",
+        session_id="session-123",
+        name="planning",
+        model="claude-sonnet-4",
+        max_turns=10,
+        allowed_tools=["Read", "Write"],
+        permission_mode="bypassPermissions",
+        working_dir="./subdir",
+        output_format="json",
+        output_schema={"type": "object"},
+        max_retries=2,
+    )
+
+    assert step.id == "plan"
+    assert step.system_prompt == "You are helpful"
+    assert step.session_id == "session-123"
+    assert step.name == "planning"
+    assert step.allowed_tools == ["Read", "Write"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_success(tmp_path):
+    """Test successful agent step execution with mocked SessionManager."""
+    from agentrails.session_manager import SessionResult
+
+    # Mock session manager
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.return_value = SessionResult(
+        session_id="test-session",
+        raw_output='{"result": {"plan": "do things"}}',
+        parsed_output={"result": {"plan": "do things"}},
+        exit_code=0,
+        duration_seconds=5.0,
+    )
+
+    # Create context
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    step = AgentStep(id="plan", prompt="Create a plan")
+    result = await step.execute(WorkflowState({}), context)
+
+    assert result.status == "success"
+    assert result.step_id == "plan"
+    assert "_session_id" in result.outputs
+    assert result.outputs["_session_id"] == "test-session"
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_with_template(tmp_path):
+    """Test agent step with template rendering in prompt."""
+    from agentrails.session_manager import SessionResult
+
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.return_value = SessionResult(
+        session_id="test",
+        raw_output='{"result": "done"}',
+        parsed_output={"result": "done"},
+        exit_code=0,
+        duration_seconds=1.0,
+    )
+
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    # Prompt with template expression
+    step = AgentStep(
+        id="plan",
+        prompt="Plan for {{state.feature_name}}",
+    )
+
+    state = WorkflowState({"feature_name": "authentication"})
+    await step.execute(state, context)
+
+    # Verify session manager was called with rendered prompt
+    mock_session_manager.start_session.assert_called_once()
+    call_args = mock_session_manager.start_session.call_args
+    assert "authentication" in call_args.kwargs["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_with_system_prompt_template(tmp_path):
+    """Test agent step with template rendering in system prompt."""
+    from agentrails.session_manager import SessionResult
+
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.return_value = SessionResult(
+        session_id="test",
+        raw_output='{"result": "done"}',
+        parsed_output={"result": "done"},
+        exit_code=0,
+        duration_seconds=1.0,
+    )
+
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    step = AgentStep(
+        id="plan",
+        prompt="Plan",
+        system_prompt="You know about {{state.topic}}",
+    )
+
+    state = WorkflowState({"topic": "Python"})
+    await step.execute(state, context)
+
+    call_args = mock_session_manager.start_session.call_args
+    assert "Python" in call_args.kwargs["system_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_json_output(tmp_path):
+    """Test agent step with JSON output parsing."""
+    from agentrails.session_manager import SessionResult
+
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.return_value = SessionResult(
+        session_id="test",
+        raw_output='Here is the plan:\n```json\n{"title": "Plan A", "steps": ["a", "b"]}\n```',
+        parsed_output={},
+        exit_code=0,
+        duration_seconds=1.0,
+    )
+
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    step = AgentStep(
+        id="plan",
+        prompt="Plan",
+        output_format="json",
+    )
+
+    result = await step.execute(WorkflowState({}), context)
+
+    assert result.status == "success"
+    assert "result" in result.outputs
+    assert result.outputs["result"] == {"title": "Plan A", "steps": ["a", "b"]}
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_json_with_schema(tmp_path):
+    """Test agent step with JSON schema validation."""
+    from agentrails.session_manager import SessionResult
+
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.return_value = SessionResult(
+        session_id="test",
+        raw_output='{"title": "Plan", "steps": ["a"]}',
+        parsed_output={},
+        exit_code=0,
+        duration_seconds=1.0,
+    )
+
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "steps": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["title", "steps"],
+    }
+
+    step = AgentStep(
+        id="plan",
+        prompt="Plan",
+        output_format="json",
+        output_schema=schema,
+    )
+
+    result = await step.execute(WorkflowState({}), context)
+
+    assert result.status == "success"
+    assert "result" in result.outputs
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_parse_error(tmp_path):
+    """Test agent step with JSON parse error."""
+    from agentrails.session_manager import SessionResult
+
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.return_value = SessionResult(
+        session_id="test",
+        raw_output="This is not valid JSON at all",
+        parsed_output={},
+        exit_code=0,
+        duration_seconds=1.0,
+    )
+
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    step = AgentStep(
+        id="plan",
+        prompt="Plan",
+        output_format="json",
+    )
+
+    result = await step.execute(WorkflowState({}), context)
+
+    # Should still succeed but include parse error in outputs
+    assert result.status == "success"
+    assert "parse_error" in result.outputs
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_failure(tmp_path):
+    """Test agent step with non-zero exit code."""
+    from agentrails.session_manager import SessionResult
+
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.return_value = SessionResult(
+        session_id="test",
+        raw_output="Error occurred",
+        parsed_output={},
+        exit_code=1,
+        duration_seconds=1.0,
+    )
+
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    step = AgentStep(id="plan", prompt="Plan")
+    result = await step.execute(WorkflowState({}), context)
+
+    assert result.status == "failed"
+    assert "Exit code 1" in result.error
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_exception(tmp_path):
+    """Test agent step with SessionManager exception."""
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.side_effect = RuntimeError("Connection failed")
+
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    step = AgentStep(id="plan", prompt="Plan")
+    result = await step.execute(WorkflowState({}), context)
+
+    assert result.status == "failed"
+    assert "Connection failed" in result.error
+
+
+def test_agent_step_serialize(tmp_path):
+    """Test AgentStep serialization."""
+    step = AgentStep(
+        id="plan",
+        prompt="Create a plan",
+        system_prompt="Be helpful",
+        name="planning",
+    )
+
+    data = step.serialize()
+
+    assert data["id"] == "plan"
+    assert data["type"] == "agent"
+    assert data["prompt"] == "Create a plan"
+    assert data["system_prompt"] == "Be helpful"
+    assert data["name"] == "planning"
+
+
+def test_agent_step_deserialize():
+    """Test AgentStep deserialization."""
+    data = {
+        "id": "plan",
+        "type": "agent",
+        "prompt": "Create a plan",
+        "system_prompt": "Be helpful",
+        "name": "planning",
+        "model": "claude-sonnet-4",
+        "max_turns": 10,
+        "allowed_tools": ["Read"],
+        "permission_mode": "bypassPermissions",
+        "working_dir": ".",
+        "depends_on": [],
+        "output_format": "json",
+        "max_retries": 2,
+    }
+
+    step = AgentStep.deserialize(data)
+
+    assert step.id == "plan"
+    assert step.prompt == "Create a plan"
+    assert step.system_prompt == "Be helpful"
+    assert step.name == "planning"
+    assert step.model == "claude-sonnet-4"
+    assert step.max_turns == 10
+    assert step.allowed_tools == ["Read"]
+
+
+def test_agent_step_serialize_deserialize_roundtrip():
+    """Test AgentStep serialize/deserialize roundtrip."""
+    original = AgentStep(
+        id="plan",
+        prompt="Plan",
+        system_prompt="Helpful",
+        name="planning",
+        model="claude-sonnet-4",
+        max_turns=5,
+    )
+
+    data = original.serialize()
+    restored = AgentStep.deserialize(data)
+
+    assert restored.id == original.id
+    assert restored.prompt == original.prompt
+    assert restored.system_prompt == original.system_prompt
+    assert restored.name == original.name
+    assert restored.model == original.model

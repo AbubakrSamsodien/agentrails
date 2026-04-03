@@ -1,0 +1,6 @@
+name: smoke_test
+steps:
+  - id: hello
+    type: shell
+    script: "echo hello"
+    output_format: text

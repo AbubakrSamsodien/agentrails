@@ -1,0 +1,18 @@
+# NOTE: LoopStep is experimental (Sprint 6). May have edge cases.
+name: retry_loop
+steps:
+  - id: initial
+    type: shell
+    script: "python -c 'import random; exit(0 if random.random() > 0.5 else 1)'"
+  - id: retry
+    type: loop
+    depends_on: [initial]
+    max_iterations: 3
+    until: "{{state.retry.latest.initial.return_code == 0}}"
+    body:
+      - id: fix
+        type: shell
+        script: "echo 'Retrying...'"
+      - id: attempt
+        type: shell
+        script: "python -c 'import random; exit(0 if random.random() > 0.3 else 1)'"

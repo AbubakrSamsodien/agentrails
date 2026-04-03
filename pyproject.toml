@@ -1,0 +1,121 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentrails"
+version = "0.1.0"
+description = "Deterministic AI workflow runtime for orchestrating Claude Code and CLI tools"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+authors = [
+    { name = "AgentRails Contributors" },
+]
+keywords = ["ai", "workflow", "claude", "automation", "pipeline", "agent", "orchestration"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+dependencies = [
+    "click==8.3.1",
+    "jinja2==3.1.6",
+    "jsonschema==4.26.0",
+    "pyyaml==6.0.3",
+    "aiosqlite==0.22.1",
+]
+
+[project.optional-dependencies]
+interactive = [
+    "rich==14.3.3",
+    "textual==3.1.0",
+]
+postgres = [
+    "asyncpg==0.31.0",
+]
+dev = [
+    "pytest==9.0.2",
+    "pytest-asyncio==1.3.0",
+    "pytest-cov==7.1.0",
+    "ruff==0.15.8",
+    "pylint==4.0.5",
+    "vulture==2.16",
+    "rich==14.3.3",
+    "textual==3.1.0",
+]
+
+[project.scripts]
+agentrails = "agentrails.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/agentrails/agentrails"
+Repository = "https://github.com/agentrails/agentrails"
+Documentation = "https://github.com/agentrails/agentrails#readme"
+"Bug Tracker" = "https://github.com/agentrails/agentrails/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "realcli: marks tests that require real Claude CLI (skip by default)",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TCH"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.pylint.main]
+load-plugins = []
+jobs = 0
+
+[tool.pylint."messages control"]
+disable = [
+    "C0114",  # missing-module-docstring (handled by ruff)
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "R0903",  # too-few-public-methods
+    # Acceptable patterns for this codebase
+    "R0913",  # too-many-arguments (common for config/step classes)
+    "R0914",  # too-many-locals
+    "R0912",  # too-many-branches
+    "R0915",  # too-many-statements
+    "R0902",  # too-many-instance-attributes (dataclasses)
+    "R0917",  # too-many-positional-arguments
+    "W0622",  # redefined-builtin (id, type are standard param names)
+    "W0718",  # broad-exception-caught (appropriate for boundary code)
+    "W0123",  # eval-used (necessary for template expressions)
+    "R0801",  # duplicate-code
+    "W0511",  # fixme
+    "C0415",  # import-outside-toplevel (avoids circular imports)
+    "R1702",  # too-many-nested-blocks (engine loop complexity)
+    "W0621",  # redefined-outer-name (click decorators)
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.vulture]
+min_confidence = 70
+paths = ["agentrails/"]
+ignore_decorators = ["@click.command", "@click.group", "@click.option", "@click.argument"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentrails"]

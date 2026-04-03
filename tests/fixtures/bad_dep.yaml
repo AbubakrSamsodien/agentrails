@@ -1,0 +1,9 @@
+name: bad_dep_invalid
+steps:
+  - id: step1
+    type: shell
+    script: "echo step1"
+  - id: step2
+    type: shell
+    script: "echo step2"
+    depends_on: [nonexistent]

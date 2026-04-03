@@ -1,0 +1,22 @@
+name: parallel_tests
+steps:
+  - id: setup
+    type: shell
+    script: "pip install -e ."
+  - id: all_tests
+    type: parallel_group
+    depends_on: [setup]
+    max_concurrency: 4
+    branches:
+      - id: unit
+        type: shell
+        script: "pytest tests/unit -q"
+      - id: integration
+        type: shell
+        script: "pytest tests/integration -q"
+      - id: lint
+        type: shell
+        script: "ruff check agentrails/"
+      - id: pylint
+        type: shell
+        script: "pylint agentrails/"
