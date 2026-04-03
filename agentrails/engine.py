@@ -445,7 +445,7 @@ class WorkflowRunner:
             Dict with keys: status, error, state, completed, step_results
         """
         from agentrails.steps.base import ExecutionContext, StepResult
-        from agentrails.template import render_template
+        from agentrails.template import TemplateRenderError, evaluate_condition
 
         step_map: dict[str, BaseStep] = {step.id: step for step in workflow.steps}
         workflow_status: Literal["completed", "failed", "cancelled"] = "completed"
@@ -499,11 +499,10 @@ class WorkflowRunner:
                     # ConditionalStep uses 'if' field internally, not 'condition'.
                     if step.condition and not isinstance(step, ConditionalStep):
                         try:
-                            rendered = render_template(step.condition, state.snapshot())
-                            condition_result = self._eval_condition(rendered)
-                        except Exception as e:  # pylint: disable=W0718
+                            condition_result = evaluate_condition(step.condition, state.snapshot())
+                        except TemplateRenderError as e:
                             condition_result = False
-                            logger.warning("Condition eval failed for %s: %s", step.id, e)
+                            logger.warning("Condition evaluation failed for %s: %s", step.id, e)
 
                         if not condition_result:
                             # Skip this step
@@ -635,19 +634,23 @@ class WorkflowRunner:
                         )
 
                     if result.status == "success":
-                        # Merge outputs into state
-                        for key, value in result.outputs.items():
-                            state = state.set(key, value)
-                            # Emit state_updated event
-                            event = EventLog.create_event(
-                                workflow_id,
-                                run_id,
-                                "state_updated",
-                                step_id=step.id,
-                                data={"key": key, "value": value, "state": state.snapshot()},
-                            )
-                            event_log.append(event)
-                            await store.append_event(event)
+                        # Merge outputs into state under step ID
+                        # This makes outputs accessible as {{state.step_id.key}}
+                        state = state.set(step.id, result.outputs)
+                        # Emit state_updated event
+                        event = EventLog.create_event(
+                            workflow_id,
+                            run_id,
+                            "state_updated",
+                            step_id=step.id,
+                            data={
+                                "key": step.id,
+                                "value": result.outputs,
+                                "state": state.snapshot(),
+                            },
+                        )
+                        event_log.append(event)
+                        await store.append_event(event)
 
                         # Validate state against schema (if defined)
                         if workflow.state_schema:
@@ -762,27 +765,6 @@ class WorkflowRunner:
             "completed": completed,
             "step_results": step_results,
         }
-
-    def _eval_condition(self, rendered: str) -> bool:
-        """Evaluate a rendered condition string as a boolean.
-
-        Args:
-            rendered: Rendered template string (e.g., "True", "False", "0", "1")
-
-        Returns:
-            Boolean result
-        """
-        rendered = rendered.strip().lower()
-        if rendered in ("true", "1", "yes"):
-            return True
-        if rendered in ("false", "0", "no", ""):
-            return False
-        # Try to eval as Python expression (safe subset)
-        try:
-            # pylint: disable=W0123
-            return bool(eval(rendered, {"__builtins__": {}}, {}))
-        except Exception:  # pylint: disable=W0718
-            return bool(rendered)
 
     def _find_failed_step(self, step_results: dict[str, StepResult]) -> str | None:
         """Find the first failed step."""

@@ -102,7 +102,7 @@ steps:
   - id: branch
     type: conditional
     depends_on: [check]
-    if: "{{'success' in state.stdout}}"
+    if: "{{'success' in state.check.stdout}}"
     then: [then_path]
     else: [else_path]
   - id: then_path

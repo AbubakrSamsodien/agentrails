@@ -1,0 +1,55 @@
+# Test workflow for LoopStep
+# This workflow simulates a retry loop with a flaky operation
+
+name: test_loop_step
+
+steps:
+  # Step 1: Initialize attempt counter file
+  - id: init
+    type: shell
+    script: "echo 0 > /tmp/loop_test_counter.txt && echo 'Counter initialized'"
+    output_format: text
+
+  # Step 2: Retry loop - simulates flaky operation
+  - id: retry_loop
+    type: loop
+    depends_on: [init]
+    max_iterations: 5
+    until: "{{state.retry_loop.latest.check.return_code == 0}}"
+    body:
+      # Read counter, increment, check if should succeed
+      - id: increment
+        type: shell
+        script: |
+          COUNT=$(cat /tmp/loop_test_counter.txt 2>/dev/null || echo 0)
+          COUNT=$((COUNT + 1))
+          echo $COUNT > /tmp/loop_test_counter.txt
+          echo "Attempt $COUNT"
+          
+      # Check step - succeeds on attempt 3
+      - id: check
+        type: shell
+        script: |
+          COUNT=$(cat /tmp/loop_test_counter.txt)
+          if [ "$COUNT" -ge 3 ]; then
+            echo "Success on attempt $COUNT!"
+            exit 0
+          else
+            echo "Attempt $COUNT failed (need 3)"
+            exit 1
+          fi
+
+  # Step 3: Report results
+  - id: report
+    type: shell
+    depends_on: [retry_loop]
+    script: |
+      echo "=== Loop Step Test Results ==="
+      echo "Total iterations: {{state.retry_loop.iteration_count}}"
+      echo "Test {{state.retry_loop.latest.check.return_code == 0 and 'PASSED' or 'FAILED'}}!"
+      
+  # Cleanup
+  - id: cleanup
+    type: shell
+    depends_on: [report]
+    script: "rm -f /tmp/loop_test_counter.txt && echo 'Cleanup complete'"

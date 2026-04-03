@@ -2,13 +2,61 @@
 
 > **Project:** AgentRails — Deterministic AI Workflow Runtime
 > **Created:** 2026-04-01
-> **Status:** Sprint 6 Complete (Public Release Ready)
+> **Status:** All Sprints Complete ✅
 > **Methodology:** Priority-based Agile (MoSCoW + story points)
-> **Last Updated:** 2026-04-03 — Sprint 6 delivered: CI fixes, session persistence polish, extended integration tests, GitHub issue templates, examples cleanup, LICENSE update, README polish — 224 tests passing (86% coverage), ruff + pylint (10.00/10) + vulture all pass, v0.1.0 tagged
+> **Last Updated:** 2026-04-03 — All sprints complete: 238 tests passing (87% coverage), ruff + pylint (10.00/10) + vulture all pass, v0.1.0 tagged
 
 ---
 
 ## Completed Sprints
+
+### Sprint 6 — Resilience, Polish & Release Prep (Weeks 11-12) ✅
+**Stats:** 224 tests passing (86% coverage), lint 10.00/10, v0.1.0 tagged
+
+| Task | Priority | Points | Status |
+|------|----------|--------|--------|
+| `RAIL-052` Retry & Recovery | P1 | 3 | ✅ Complete |
+| `RAIL-081` Prompt File Refs | P1 | 2 | ✅ Complete |
+| `RAIL-100` CLAUDE.md | P1 | 2 | ✅ Complete |
+| Fix CI (drop typecheck) | P0 | 1 | ✅ Complete |
+| `RAIL-041` Session Persistence | P1 | 1 | ✅ Complete |
+| `RAIL-091` Integration Tests | P1 | 3 | ✅ Complete |
+| `RAIL-092` Replay Tests | P1 | 1 | ✅ Complete |
+| Real Claude CLI Test | P1 | 1 | ✅ Complete |
+| `RAIL-110` Go-Public Checklist | P1 | 5 | ✅ Complete |
+| `RAIL-103` README Polish | P1 | 2 | ✅ Complete |
+| **Sprint Total** | | **21** | ✅ Complete |
+
+**Completed:** 2026-04-03 — All P1 tasks complete, public release ready.
+
+### Sprint 8 — Extensions Part 1 (Week 17) ✅ Complete
+**Stats:** 238 tests passing (+16), 87% coverage, lint 10.00/10
+
+| Task | Priority | Points | Status |
+|------|----------|--------|--------|
+| Tech debt: Safe condition evaluator | P1 | 2 | ✅ Complete |
+| `RAIL-035` LoopStep | P2 | 5 | ✅ Complete |
+| `RAIL-036` HumanStep | P2 | 3 | ✅ Complete |
+| `RAIL-062` Postgres Backend | P2 | 5 | ✅ Complete |
+| `RAIL-072` Interactive Display | P2 | 5 | ✅ Complete |
+| `RAIL-101` Authoring Guide | P2 | 3 | ✅ Complete |
+| **Sprint Total** | | **23** | **23/23 pts** |
+
+**Completed:** 2026-04-03 — Sprint 8 complete: All P2 extensions delivered.
+
+**Key Deliverables:**
+- **Safe condition evaluation:** `template.py` now uses Jinja2's `compile_expression()` instead of `eval()`
+- **LoopStep:** Proper state updates between iterations, `{{state.loop_id.latest.xxx}}` access, serialize/deserialize
+- **HumanStep:** Stdin JSON input, schema validation, timeout handling
+- **ShellStep:** Added `output_format: json/toml` support with `OutputParser`
+- **Engine fix:** State merged under step ID (`state.step_id.outputs`)
+- **PostgreSQL backend:** Full `asyncpg` implementation with JSONB support, connection pooling, 10 methods implemented
+- **Interactive display:** Rich-based live dashboard with status symbols, colors, real-time updates
+- **Workflow authoring guide:** Comprehensive 400+ line documentation in `docs/WORKFLOW_AUTHORING.md`
+
+**Example workflows:**
+- `examples/test_loop.yaml` — Retry loop demo (3 iterations)
+- `examples/test_human.yaml` — Human approval with schema validation
 
 ### Sprint 1 — Foundation (24 points) ✅
 
@@ -213,8 +261,8 @@ agentrails/                          # Repository root
 │   │   ├── test_agent_step.py
 │   │   ├── test_parallel_step.py
 │   │   ├── test_conditional_step.py
-│   │   ├── test_loop_step.py
-│   │   └── test_human_step.py
+│   │   ├── test_loop_step.py        # 9 tests (updated Sprint 8)
+│   │   └── test_human_step.py       # 9 tests (updated Sprint 8)
 │   ├── test_cli.py                  # CLI integration tests
 │   ├── integration/                 # End-to-end integration tests
 │   │   ├── __init__.py
@@ -239,6 +287,8 @@ agentrails/                          # Repository root
 │   ├── simple_linear.yaml
 │   ├── parallel_tests.yaml
 │   ├── retry_loop.yaml
+│   ├── test_loop.yaml               # LoopStep demo workflow
+│   ├── test_human.yaml              # HumanStep demo workflow
 │   └── prompts/
 │       ├── architect.md
 │       └── code_only.md
@@ -2307,16 +2357,6 @@ graph TD
 | **Sprint Total** | | **8** |
 
 **Note:** Sprint 7 tasks were pulled forward into Sprint 6 for a single release sprint.
-
-### Sprint 8 — Extensions (Post-launch)
-| Task | Priority | Points |
-|------|----------|--------|
-| `RAIL-035` LoopStep | P2 | 5 |
-| `RAIL-036` HumanStep | P2 | 3 |
-| `RAIL-062` Postgres Backend | P2 | 5 |
-| `RAIL-072` Interactive Display | P2 | 5 |
-| `RAIL-101` Authoring Guide | P2 | 3 |
-| **Sprint Total** | | **21** |
 
 ---
 

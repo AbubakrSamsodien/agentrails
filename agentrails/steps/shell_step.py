@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from agentrails.output import OutputParseError, OutputParser
 from agentrails.steps.base import BaseStep, ExecutionContext, StepResult
 from agentrails.template import render_template
 
@@ -93,15 +94,27 @@ class ShellStep(BaseStep):
 
             duration = time.time() - start_time
             return_code = proc.returncode or 0
+            stdout_str = stdout.decode()
+            stderr_str = stderr.decode()
+            error: str | None = None
 
             outputs = {
                 "return_code": return_code,
-                "stdout": stdout.decode(),
-                "stderr": stderr.decode(),
+                "stdout": stdout_str,
+                "stderr": stderr_str,
             }
 
+            # Parse output for structured formats
+            if self.output_format in ("json", "toml") and stdout_str.strip():
+                try:
+                    parsed = OutputParser.parse(stdout_str, self.output_format, self.output_schema)
+                    outputs["parsed"] = parsed
+                except OutputParseError as e:
+                    error = f"Output parse error: {e}"
+                    return_code = 1
+
             status = "success" if return_code == 0 else "failed"
-            error = None if return_code == 0 else f"Exit code {return_code}"
+            error = error or (None if return_code == 0 else f"Exit code {return_code}")
 
             return StepResult(
                 step_id=self.id,

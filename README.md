@@ -3,7 +3,7 @@
 Deterministic AI workflow runtime for orchestrating Claude Code and CLI tools.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![CI](https://github.com/agentrails/agentrails/actions/workflows/ci.yml/badge.svg)](https://github.com/agentrails/agentrails/actions)
 
 ## What is AgentRails?
@@ -155,4 +155,4 @@ steps:
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE) for details.
+GNU Affero General Public License v3.0 — see [LICENSE](LICENSE) for details.

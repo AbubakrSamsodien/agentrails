@@ -2,7 +2,11 @@
 
 import pytest
 
-from agentrails.template import TemplateRenderError, render_template
+from agentrails.template import (
+    TemplateRenderError,
+    evaluate_condition,
+    render_template,
+)
 
 
 def test_render_simple():
@@ -63,3 +67,53 @@ def test_render_no_variables():
     """Test template with no variables."""
     result = render_template("Plain text", {})
     assert result == "Plain text"
+
+
+class TestEvaluateCondition:
+    """Tests for evaluate_condition()."""
+
+    def test_condition_with_wrapper(self):
+        """Test condition with {{...}} wrapper."""
+        state = {"count": 5}
+        assert evaluate_condition("{{state.count > 0}}", state) is True
+        assert evaluate_condition("{{state.count < 0}}", state) is False
+
+    def test_condition_without_wrapper(self):
+        """Test condition without {{...}} wrapper."""
+        state = {"status": "ready"}
+        assert evaluate_condition("state.status == 'ready'", state) is True
+        assert evaluate_condition("state.status != 'ready'", state) is False
+
+    def test_condition_boolean_operators(self):
+        """Test boolean operators in conditions."""
+        state = {"a": True, "b": False, "c": True}
+        assert evaluate_condition("{{state.a and state.c}}", state) is True
+        assert evaluate_condition("{{state.a and state.b}}", state) is False
+        assert evaluate_condition("{{state.a or state.b}}", state) is True
+        assert evaluate_condition("{{not state.b}}", state) is True
+
+    def test_condition_nested_access(self):
+        """Test nested dot-path access in conditions."""
+        state = {"tests": {"unit": {"passed": True}}}
+        assert evaluate_condition("{{state.tests.unit.passed == True}}", state) is True
+        assert evaluate_condition("{{state.tests.unit.passed == False}}", state) is False
+
+    def test_condition_undefined_variable(self):
+        """Test that undefined variables raise TemplateRenderError."""
+        state = {"key": "value"}
+        with pytest.raises(TemplateRenderError):
+            evaluate_condition("{{state.undefined == True}}", state)
+
+    def test_condition_whitespace_handling(self):
+        """Test whitespace handling in condition wrapper."""
+        state = {"x": 1}
+        # Various whitespace patterns
+        assert evaluate_condition("  {{state.x == 1}}  ", state) is True
+        assert evaluate_condition("{{  state.x == 1  }}", state) is True
+        assert evaluate_condition("{{ state.x == 1 }}", state) is True
+
+    def test_condition_invalid_expression(self):
+        """Test that invalid expressions raise TemplateRenderError."""
+        state = {"x": 1}
+        with pytest.raises(TemplateRenderError):
+            evaluate_condition("{{state.x === 1}}", state)  # Invalid Python syntax

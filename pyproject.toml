@@ -7,7 +7,7 @@ name = "agentrails"
 version = "0.1.0"
 description = "Deterministic AI workflow runtime for orchestrating Claude Code and CLI tools"
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = { text = "AGPL-3.0-only" }
 requires-python = ">=3.11"
 authors = [
     { name = "AgentRails Contributors" },
@@ -16,7 +16,7 @@ keywords = ["ai", "workflow", "claude", "automation", "pipeline", "agent", "orch
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -105,6 +105,7 @@ disable = [
     "R0801",  # duplicate-code
     "W0511",  # fixme
     "C0415",  # import-outside-toplevel (avoids circular imports)
+    "R0401",  # cyclic-import (false positive with lazy imports in deserialize)
     "R1702",  # too-many-nested-blocks (engine loop complexity)
     "W0621",  # redefined-outer-name (click decorators)
 ]

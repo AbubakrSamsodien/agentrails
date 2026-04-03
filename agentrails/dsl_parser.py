@@ -316,7 +316,6 @@ def _create_step(
             id=step_data["id"],
             message=step_data.get("message", "Please provide input"),
             input_schema=step_data.get("input_schema"),
-            timeout=step_data.get("timeout"),
             **base_kwargs,
         )
 

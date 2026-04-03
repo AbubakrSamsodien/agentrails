@@ -7,7 +7,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from agentrails.steps.base import BaseStep, ExecutionContext, StepResult
-from agentrails.template import render_template
+from agentrails.template import TemplateRenderError, evaluate_condition
 
 if TYPE_CHECKING:
     from agentrails.state import WorkflowState
@@ -66,9 +66,11 @@ class LoopStep(BaseStep):
         start_time = time.time()
         iterations: list[dict[str, Any]] = []
         error: str | None = None
+        latest_outputs: dict[str, Any] = {}
 
-        for _iteration_num in range(self.max_iterations):
+        for iteration_num in range(self.max_iterations):
             iteration_outputs: dict[str, Any] = {}
+            iteration_error: str | None = None
 
             # Execute body steps
             for step in self.body:
@@ -76,43 +78,53 @@ class LoopStep(BaseStep):
                 iteration_outputs[step.id] = result.outputs
 
                 if result.status == "failed":
-                    error = f"{step.id}: {result.error}"
+                    iteration_error = f"{step.id}: {result.error}"
                     break
 
             # Store iteration results
             iterations.append(iteration_outputs)
+            latest_outputs = iteration_outputs
 
-            # Check exit condition
-            latest_state = {"latest": iteration_outputs, "iterations": iterations}
+            # Update state with current iteration results so condition can access them
+            # This makes state.{loop_id}.latest, state.{loop_id}.iterations, and state.{loop_id}.iteration_count available
+            state = state.set(f"{self.id}.latest", latest_outputs)
+            state = state.set(f"{self.id}.iterations", iterations)
+            state = state.set(f"{self.id}.iteration_count", len(iterations))
+
+            # Check exit condition against full workflow state
             try:
-                rendered = render_template(self.until, latest_state)
-                condition_value = eval(rendered, {"__builtins__": {}}, {})
-                if condition_value:
+                if evaluate_condition(self.until, state.snapshot()):
+                    # Condition satisfied - clear any iteration errors and exit successfully
+                    error = None
                     break
-            except Exception:
-                pass  # Continue to next iteration
+            except TemplateRenderError as e:
+                context.logger.warning(
+                    "Iteration %d: condition evaluation failed: %s. Continuing.",
+                    iteration_num + 1,
+                    e,
+                )
+
+            # If body step failed, record error for potential retry
+            # This error will be cleared if a later iteration succeeds
+            if iteration_error:
+                error = iteration_error
 
         duration = time.time() - start_time
 
+        # Return outputs - engine will wrap under step ID
         outputs = {
+            "latest": latest_outputs,
             "iterations": iterations,
             "iteration_count": len(iterations),
         }
 
         # Check if we exhausted max iterations without satisfying condition
         if len(iterations) >= self.max_iterations and error is None:
-            # Check if condition is satisfied
-            latest_state = {
-                "latest": iterations[-1] if iterations else {},
-                "iterations": iterations,
-            }
             try:
-                rendered = render_template(self.until, latest_state)
-                condition_value = eval(rendered, {"__builtins__": {}}, {})
-                if not condition_value:
+                if not evaluate_condition(self.until, state.snapshot()):
                     error = f"Max iterations ({self.max_iterations}) reached without satisfying condition"
-            except Exception:
-                error = "Could not evaluate until condition"
+            except TemplateRenderError as e:
+                error = f"Could not evaluate until condition: {e}"
 
         return StepResult(
             step_id=self.id,
@@ -121,4 +133,49 @@ class LoopStep(BaseStep):
             raw_output="",
             duration_seconds=duration,
             error=error,
+        )
+
+    def serialize(self) -> dict[str, Any]:
+        """Serialize step to dictionary."""
+        data = super().serialize()
+        data.update(
+            {
+                "body": [step.serialize() for step in self.body],
+                "until": self.until,
+                "max_iterations": self.max_iterations,
+            }
+        )
+        return data
+
+    @classmethod
+    def deserialize(cls, data: dict[str, Any]) -> LoopStep:
+        """Deserialize step from dictionary."""
+        # Lazy import to avoid circular dependency with dsl_parser
+        from pathlib import Path  # pylint: disable=C0415
+
+        from agentrails.dsl_parser import (  # pylint: disable=C0415
+            WorkflowDefaults,
+            _create_step,
+        )
+
+        defaults = WorkflowDefaults()
+        yaml_dir = Path.cwd()  # Default for deserialization
+        body = [
+            _create_step(step_data, defaults, set(), yaml_dir) for step_data in data.get("body", [])
+        ]
+
+        return cls(
+            id=data["id"],
+            body=body,
+            until=data.get("until", ""),
+            max_iterations=data.get("max_iterations", 5),
+            depends_on=data.get("depends_on", []),
+            outputs=data.get("outputs", {}),
+            output_format=data.get("output_format", "text"),
+            output_schema=data.get("output_schema"),
+            max_retries=data.get("max_retries", 0),
+            timeout_seconds=data.get("timeout_seconds"),
+            retry_delay_seconds=data.get("retry_delay_seconds", 5.0),
+            retry_backoff=data.get("retry_backoff", "fixed"),
+            retry_on=data.get("retry_on", ["error", "timeout"]),
         )

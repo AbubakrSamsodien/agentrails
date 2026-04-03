@@ -17,18 +17,22 @@ async def test_runner_state_validation_success(tmp_path):
     from agentrails.engine import WorkflowRunner
 
     # Create a workflow with state schema
-    # ShellStep outputs stdout, stderr, return_code
+    # ShellStep outputs stdout, stderr, return_code under step ID
     workflow_file = tmp_path / "workflow.yaml"
     workflow_file.write_text("""
 name: validation_test
 state:
   type: object
   properties:
-    stdout:
-      type: string
-    return_code:
-      type: integer
-  required: [stdout, return_code]
+    step1:
+      type: object
+      properties:
+        stdout:
+          type: string
+        return_code:
+          type: integer
+      required: [stdout, return_code]
+  required: [step1]
 steps:
   - id: step1
     type: shell
@@ -40,8 +44,8 @@ steps:
     result = await runner.run(str(workflow_file))
 
     assert result.status == "completed"
-    assert "success" in result.final_state.get("stdout", "")
-    assert result.final_state.get("return_code") == 0
+    assert "success" in result.final_state.get("step1", {}).get("stdout", "")
+    assert result.final_state.get("step1", {}).get("return_code") == 0
     await runner.close()
 
 
@@ -51,7 +55,7 @@ async def test_runner_state_validation_failure(tmp_path):
     from agentrails.engine import WorkflowRunner
 
     # Create a workflow with state schema that will fail
-    # ShellStep always outputs stdout (string) and return_code (integer)
+    # ShellStep always outputs stdout (string) and return_code (integer) under step ID
     # We require a "count" field which won't exist
     workflow_file = tmp_path / "workflow.yaml"
     workflow_file.write_text("""
@@ -59,9 +63,13 @@ name: validation_fail_test
 state:
   type: object
   properties:
-    count:
-      type: integer
-  required: [count]
+    step1:
+      type: object
+      properties:
+        count:
+          type: integer
+      required: [count]
+  required: [step1]
 steps:
   - id: step1
     type: shell

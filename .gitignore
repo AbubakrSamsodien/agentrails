@@ -63,3 +63,6 @@ htmlcov/
 # Local configuration
 *.local.yaml
 *.local.json
+
+# Project planning
+TASKPLAN.md

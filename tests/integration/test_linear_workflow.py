@@ -63,7 +63,7 @@ steps:
   - id: consume
     type: shell
     depends_on: [produce]
-    script: "echo {{state.stdout | trim}}"
+    script: "echo {{state.produce.stdout | trim}}"
 """)
 
     runner = WorkflowRunner(working_directory=tmp_path)
@@ -71,4 +71,4 @@ steps:
     await runner.close()
 
     assert result.status == "completed"
-    assert "test_value" in result.final_state.get("stdout", "")
+    assert "test_value" in result.final_state.get("produce", {}).get("stdout", "")
