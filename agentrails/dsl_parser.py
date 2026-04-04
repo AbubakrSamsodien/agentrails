@@ -300,6 +300,7 @@ def _create_step(
             id=step_data["id"],
             prompt=step_data["prompt"],
             system_prompt=system_prompt,
+            subagent=step_data.get("subagent"),
             session_id=step_data.get("session_id"),
             name=step_data.get("name"),
             model=step_data.get("model", defaults.model),

@@ -26,6 +26,7 @@ MIN_CLAUDE_VERSION = (1, 0, 0)
 VERSION_WITH_BARE_FLAG = (1, 0, 0)
 VERSION_WITH_PERMISSION_MODE = (1, 0, 0)
 VERSION_WITH_JSON_SCHEMA = (1, 0, 0)
+VERSION_WITH_AGENT_FLAG = (1, 0, 0)
 
 
 @dataclass
@@ -198,6 +199,7 @@ class SessionManager:
             "bare": VERSION_WITH_BARE_FLAG,
             "permission_mode": VERSION_WITH_PERMISSION_MODE,
             "json_schema": VERSION_WITH_JSON_SCHEMA,
+            "agent": VERSION_WITH_AGENT_FLAG,
         }
 
         min_version = flag_versions.get(flag_name)
@@ -220,6 +222,7 @@ class SessionManager:
         permission_mode: str | None = None,
         timeout: int | None = None,
         env: dict[str, str] | None = None,
+        subagent: str | None = None,
     ) -> SessionResult:
         """Start a Claude CLI session.
 
@@ -236,6 +239,7 @@ class SessionManager:
             permission_mode: Permission mode (default, acceptEdits, plan, auto, bypassPermissions)
             timeout: Timeout in seconds
             env: Additional environment variables
+            subagent: Subagent name to invoke (--agent flag)
 
         Returns:
             SessionResult with output and metadata
@@ -244,7 +248,15 @@ class SessionManager:
 
         async with self._semaphore:
             # Build command
-            cmd = [self.claude_path, "--bare"]
+            cmd = [self.claude_path]
+
+            # Omit --bare when using subagent to allow subagent config loading
+            if not subagent:
+                cmd.append("--bare")
+
+            # Subagent (--agent flag)
+            if subagent:
+                cmd.extend(["--agent", subagent])
 
             # Session ID (new or resume)
             if session_id:

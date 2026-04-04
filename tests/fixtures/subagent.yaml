@@ -1,0 +1,19 @@
+name: subagent_example
+
+steps:
+  - id: notify_slack
+    type: agent
+    subagent: slack
+    prompt: "Post a deployment summary to #engineering channel"
+
+  - id: create_ticket
+    type: agent
+    subagent: jira
+    prompt: "Create a bug ticket for the reported issue"
+    depends_on: [notify_slack]
+
+  - id: update_gitlab
+    type: agent
+    subagent: gitlab
+    prompt: "Update the merge request with test results"
+    depends_on: [create_ticket]

@@ -267,6 +267,7 @@ steps:
   system_prompt: |
     You are a senior architect. Respond with JSON matching the schema.
   system_prompt_file: prompts/architect.md  # Alternative: load from file
+  subagent: null  # or: slack, jira, gitlab, code-reviewer (invokes --agent flag)
   output_format: json
   output_schema:
     type: object

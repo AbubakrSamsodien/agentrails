@@ -23,6 +23,7 @@ def test_agent_step_with_all_fields():
         id="plan",
         prompt="Create a plan",
         system_prompt="You are helpful",
+        subagent="code-reviewer",
         session_id="session-123",
         name="planning",
         model="claude-sonnet-4",
@@ -37,6 +38,7 @@ def test_agent_step_with_all_fields():
 
     assert step.id == "plan"
     assert step.system_prompt == "You are helpful"
+    assert step.subagent == "code-reviewer"
     assert step.session_id == "session-123"
     assert step.name == "planning"
     assert step.allowed_tools == ["Read", "Write"]
@@ -148,6 +150,78 @@ async def test_agent_step_execute_with_system_prompt_template(tmp_path):
 
     call_args = mock_session_manager.start_session.call_args
     assert "Python" in call_args.kwargs["system_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_with_subagent_template(tmp_path):
+    """Test agent step with template rendering in subagent field."""
+    from agentrails.session_manager import SessionResult
+
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.return_value = SessionResult(
+        session_id="test",
+        raw_output='{"result": "done"}',
+        parsed_output={"result": "done"},
+        exit_code=0,
+        duration_seconds=1.0,
+    )
+
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    step = AgentStep(
+        id="notify",
+        prompt="Send notification",
+        subagent="{{state.target_agent}}",
+    )
+
+    state = WorkflowState({"target_agent": "slack"})
+    await step.execute(state, context)
+
+    call_args = mock_session_manager.start_session.call_args
+    assert call_args.kwargs["subagent"] == "slack"
+
+
+@pytest.mark.asyncio
+async def test_agent_step_execute_passes_subagent_to_session_manager(tmp_path):
+    """Test that subagent field is passed to session_manager.start_session()."""
+    from agentrails.session_manager import SessionResult
+
+    mock_session_manager = AsyncMock()
+    mock_session_manager.start_session.return_value = SessionResult(
+        session_id="test",
+        raw_output='{"result": "done"}',
+        parsed_output={"result": "done"},
+        exit_code=0,
+        duration_seconds=1.0,
+    )
+
+    context = ExecutionContext(
+        workflow_id="wf1",
+        run_id="run1",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=mock_session_manager,
+        state_store=None,
+    )
+
+    step = AgentStep(
+        id="notify",
+        prompt="Send notification",
+        subagent="jira",
+    )
+
+    state = WorkflowState({})
+    await step.execute(state, context)
+
+    call_args = mock_session_manager.start_session.call_args
+    assert call_args.kwargs["subagent"] == "jira"
 
 
 @pytest.mark.asyncio
@@ -325,6 +399,7 @@ def test_agent_step_serialize(tmp_path):
         id="plan",
         prompt="Create a plan",
         system_prompt="Be helpful",
+        subagent="slack",
         name="planning",
     )
 
@@ -334,6 +409,7 @@ def test_agent_step_serialize(tmp_path):
     assert data["type"] == "agent"
     assert data["prompt"] == "Create a plan"
     assert data["system_prompt"] == "Be helpful"
+    assert data["subagent"] == "slack"
     assert data["name"] == "planning"
 
 
@@ -344,6 +420,7 @@ def test_agent_step_deserialize():
         "type": "agent",
         "prompt": "Create a plan",
         "system_prompt": "Be helpful",
+        "subagent": "jira",
         "name": "planning",
         "model": "claude-sonnet-4",
         "max_turns": 10,
@@ -360,6 +437,7 @@ def test_agent_step_deserialize():
     assert step.id == "plan"
     assert step.prompt == "Create a plan"
     assert step.system_prompt == "Be helpful"
+    assert step.subagent == "jira"
     assert step.name == "planning"
     assert step.model == "claude-sonnet-4"
     assert step.max_turns == 10
@@ -372,6 +450,7 @@ def test_agent_step_serialize_deserialize_roundtrip():
         id="plan",
         prompt="Plan",
         system_prompt="Helpful",
+        subagent="gitlab",
         name="planning",
         model="claude-sonnet-4",
         max_turns=5,
@@ -383,5 +462,6 @@ def test_agent_step_serialize_deserialize_roundtrip():
     assert restored.id == original.id
     assert restored.prompt == original.prompt
     assert restored.system_prompt == original.system_prompt
+    assert restored.subagent == original.subagent
     assert restored.name == original.name
     assert restored.model == original.model

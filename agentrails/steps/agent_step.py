@@ -23,6 +23,7 @@ class AgentStep(BaseStep):
             Analyze the codebase and create a plan for {{state.feature}}.
           system_prompt: |
             You are a senior software architect. Always respond with JSON.
+          subagent: null
           output_format: json
           output_schema:
             type: object
@@ -44,6 +45,7 @@ class AgentStep(BaseStep):
         id: str,  # noqa: A002
         prompt: str,
         system_prompt: str | None = None,
+        subagent: str | None = None,
         session_id: str | None = None,
         name: str | None = None,
         model: str | None = None,
@@ -59,6 +61,7 @@ class AgentStep(BaseStep):
             id: Unique step identifier
             prompt: User prompt (supports templates)
             system_prompt: System prompt (supports templates)
+            subagent: Subagent name to invoke (supports templates)
             session_id: Session ID to resume (None = new session)
             name: Display name for session
             model: Model override
@@ -71,6 +74,7 @@ class AgentStep(BaseStep):
         super().__init__(id=id, type="agent", **kwargs)
         self.prompt = prompt
         self.system_prompt = system_prompt
+        self.subagent = subagent
         self.session_id = session_id
         self.name = name
         self.model = model
@@ -94,6 +98,9 @@ class AgentStep(BaseStep):
         rendered_system_prompt = None
         if self.system_prompt:
             rendered_system_prompt = render_template(self.system_prompt, state.snapshot())
+        rendered_subagent = None
+        if self.subagent:
+            rendered_subagent = render_template(self.subagent, state.snapshot())
 
         # Get session manager from context
         session_manager = context.session_manager
@@ -102,6 +109,7 @@ class AgentStep(BaseStep):
             result = await session_manager.start_session(
                 prompt=rendered_prompt,
                 system_prompt=rendered_system_prompt,
+                subagent=rendered_subagent,
                 session_id=self.session_id,
                 name=self.name,
                 model=self.model,
@@ -162,6 +170,7 @@ class AgentStep(BaseStep):
             {
                 "prompt": self.prompt,
                 "system_prompt": self.system_prompt,
+                "subagent": self.subagent,
                 "session_id": self.session_id,
                 "name": self.name,
                 "model": self.model,
@@ -187,6 +196,7 @@ class AgentStep(BaseStep):
             id=data["id"],
             prompt=data["prompt"],
             system_prompt=data.get("system_prompt"),
+            subagent=data.get("subagent"),
             session_id=data.get("session_id"),
             name=data.get("name"),
             model=data.get("model"),

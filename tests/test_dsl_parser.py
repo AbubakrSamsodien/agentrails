@@ -480,3 +480,48 @@ steps:
 
     with pytest.raises(ValidationError, match="not found"):
         parse_workflow(workflow_file)
+
+
+def test_parse_agent_step_with_subagent(tmp_path):
+    """Test parsing agent step with subagent field."""
+    workflow_file = tmp_path / "subagent.yaml"
+    workflow_file.write_text("""
+name: subagent_test
+steps:
+  - id: notify
+    type: agent
+    subagent: slack
+    prompt: "Send a notification"
+  - id: ticket
+    type: agent
+    subagent: jira
+    prompt: "Create a ticket"
+""")
+
+    wf = parse_workflow(workflow_file)
+
+    assert len(wf.steps) == 2
+    notify_step = wf.steps[0]
+    ticket_step = wf.steps[1]
+
+    assert notify_step.subagent == "slack"
+    assert ticket_step.subagent == "jira"
+
+
+def test_parse_agent_step_without_subagent(tmp_path):
+    """Test parsing agent step without subagent field (None)."""
+    workflow_file = tmp_path / "no_subagent.yaml"
+    workflow_file.write_text("""
+name: no_subagent_test
+steps:
+  - id: plan
+    type: agent
+    prompt: "Create a plan"
+""")
+
+    wf = parse_workflow(workflow_file)
+
+    assert len(wf.steps) == 1
+    plan_step = wf.steps[0]
+
+    assert plan_step.subagent is None
