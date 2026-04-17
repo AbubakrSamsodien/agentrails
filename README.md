@@ -92,7 +92,7 @@ agentrails/
 ├── examples/            # Example workflows
 ├── pyproject.toml       # Project configuration
 ├── Makefile             # Build/test commands
-└── TASKPLAN.md          # Project roadmap
+└── docs/                # Guides and reference docs
 ```
 
 ## Key Commands

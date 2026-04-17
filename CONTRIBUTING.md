@@ -183,4 +183,4 @@ Key components:
 
 - Open a GitHub issue for bugs or feature requests
 - Check existing issues before creating new ones
-- Refer to `TASKPLAN.md` for the project roadmap
+- Refer to the docs in `docs/` for project guidance

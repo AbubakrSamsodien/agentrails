@@ -14,6 +14,7 @@
 6. [Error Handling & Retries](#error-handling--retries)
 7. [Best Practices](#best-practices)
 8. [Examples](#examples)
+9. [System Prompts](#system-prompts)
 
 ---
 
@@ -148,6 +149,8 @@ state.plan.outputs.title  # "Implementation Plan"
 state.plan.outputs.steps  # ["Step 1", "Step 2"]
 state.plan.raw_output     # Full Claude response
 ```
+
+**System Prompts:** The `system_prompt` field composes with workflow defaults and the AgentRails base prompt. For details on how prompts layer and best practices, see [Prompt Craft Guide](./prompt-guide.md).
 
 ---
 
@@ -749,9 +752,22 @@ permission_mode: bypassPermissions
 
 ---
 
+## System Prompts
+
+AgentRails uses a **four-layer composition model** for system prompts. When you set `system_prompt` on an agent step, it composes with:
+
+1. **AgentRails Base Prompt** — Framework-provided operational instructions (tools, safety, output discipline)
+2. **Workflow Defaults** — Project-wide context from `defaults.system_prompt`
+3. **Step Override** — Your step's `system_prompt` field
+4. **Auto-Injected Context** — Output schema and pipeline position (added automatically)
+
+For complete guidance on prompt composition, best practices, and the `raw_system_prompt` escape hatch, see the dedicated [**Prompt Craft Guide**](./prompt-guide.md).
+
+---
+
 ## See Also
 
 - `README.md` — Installation and quick start
-- `TASKPLAN.md` — Project roadmap
 - `examples/` — Example workflows
 - `tests/fixtures/` — Test workflows
+- [`prompt-guide.md`](./prompt-guide.md) — System prompt composition and best practices
