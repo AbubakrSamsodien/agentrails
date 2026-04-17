@@ -1,6 +1,6 @@
 # AgentRails
 
-Deterministic AI workflow runtime for orchestrating Claude Code and CLI tools.
+Deterministic AI workflow runtime for orchestrating agent and shell pipelines.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
@@ -8,7 +8,7 @@ Deterministic AI workflow runtime for orchestrating Claude Code and CLI tools.
 
 ## What is AgentRails?
 
-AgentRails is a workflow engine that orchestrates AI agents (via Claude Code CLI) and shell commands in deterministic, reproducible pipelines. It provides:
+AgentRails is a workflow engine that orchestrates AI agents and shell commands in deterministic, reproducible pipelines. It provides:
 
 - **YAML workflow definitions** with support for parallel execution, conditionals, and loops
 - **Structured output parsing** (JSON/TOML) for reliable agent communication
@@ -26,6 +26,8 @@ Other AI orchestration tools exist, but AgentRails was built with a different ph
 - **Control agent behavior** — system prompts at workflow and step level, with file-based templates for complex prompts
 
 AgentRails treats AI agents like any other component in a pipeline: testable, debuggable, and reproducible.
+
+AgentRails is an independent open source project. It is not affiliated with, endorsed by, or sponsored by any model provider or coding-agent vendor. Users are responsible for complying with the terms of any tools and services they connect.
 
 ## Quick Start
 
