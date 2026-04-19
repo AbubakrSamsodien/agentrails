@@ -287,72 +287,61 @@ steps:
 
 
 def test_defaults_system_prompt(tmp_path):
-    """Test that defaults.system_prompt is inherited by agent steps."""
+    """Test that workflow defaults system_prompt is available at runtime.
+
+    Note: defaults.system_prompt is no longer pre-merged into step.system_prompt.
+    Instead, it flows through ExecutionContext.workflow_default_system_prompt
+    at runtime for layered composition (RAIL-121).
+    """
     workflow_file = tmp_path / "defaults_sysprompt.yaml"
     workflow_file.write_text("""
 name: defaults_test
 defaults:
-  system_prompt: |
-    You are a helpful assistant. Always respond with JSON.
+  system_prompt: "Default prompt"
   model: claude-sonnet-4
-  output_format: json
 steps:
   - id: plan
     type: agent
-    prompt: "Create a plan"
-  - id: implement
-    type: agent
-    prompt: "Implement the plan"
+    prompt: "Plan"
 """)
 
     wf = parse_workflow(workflow_file)
 
-    # Both agent steps should inherit the defaults
-    assert len(wf.steps) == 2
-    plan_step = wf.steps[0]
-    implement_step = wf.steps[1]
+    # Step keeps its own system_prompt (or None)
+    step = wf.steps[0]
+    assert step.system_prompt is None
+    assert step.model == "claude-sonnet-4"
 
-    assert plan_step.system_prompt == "You are a helpful assistant. Always respond with JSON.\n"
-    assert plan_step.model == "claude-sonnet-4"
-    assert plan_step.output_format == "json"
-
-    assert (
-        implement_step.system_prompt == "You are a helpful assistant. Always respond with JSON.\n"
-    )
-    assert implement_step.model == "claude-sonnet-4"
-    assert implement_step.output_format == "json"
+    # Workflow default is available via wf.defaults
+    assert wf.defaults.system_prompt == "Default prompt"
 
 
 def test_step_level_system_prompt_override(tmp_path):
-    """Test that step-level system_prompt overrides defaults."""
-    workflow_file = tmp_path / "override_sysprompt.yaml"
+    """Test that step-level system_prompt takes precedence.
+
+    Note: Step keeps its own system_prompt; workflow default flows separately
+    through ExecutionContext for layered composition.
+    """
+    workflow_file = tmp_path / "override.yaml"
     workflow_file.write_text("""
 name: override_test
 defaults:
-  system_prompt: |
-    Default system prompt
-  model: claude-sonnet-4
+  system_prompt: "Default"
 steps:
   - id: plan
     type: agent
-    prompt: "Create a plan"
-    system_prompt: |
-      Custom prompt for planning
-  - id: implement
-    type: agent
-    prompt: "Implement"
+    prompt: "Plan"
+    system_prompt: "Custom step prompt"
 """)
 
     wf = parse_workflow(workflow_file)
+    step = wf.steps[0]
 
-    plan_step = wf.steps[0]
-    implement_step = wf.steps[1]
+    # Step has its own prompt
+    assert step.system_prompt == "Custom step prompt"
 
-    # Plan step should have custom prompt
-    assert plan_step.system_prompt == "Custom prompt for planning\n"
-
-    # Implement step should inherit default
-    assert implement_step.system_prompt == "Default system prompt\n"
+    # Workflow default still available
+    assert wf.defaults.system_prompt == "Default"
 
 
 def test_defaults_all_fields(tmp_path):
@@ -377,7 +366,7 @@ steps:
     wf = parse_workflow(workflow_file)
     step = wf.steps[0]
 
-    assert step.system_prompt == "Default prompt"
+    # Step fields merged from defaults (except system_prompt)
     assert step.model == "claude-opus-4"
     assert step.output_format == "json"
     assert step.max_retries == 3
@@ -385,9 +374,17 @@ steps:
     assert step.permission_mode == "bypassPermissions"
     assert step.allowed_tools == ["Read", "Write"]
 
+    # system_prompt now flows through ExecutionContext at runtime
+    assert step.system_prompt is None
+    assert wf.defaults.system_prompt == "Default prompt"
+
 
 def test_defaults_partial_override(tmp_path):
-    """Test that step can override some defaults while inheriting others."""
+    """Test that step can override some defaults while inheriting others.
+
+    Note: system_prompt is no longer pre-merged into step; it flows through
+    ExecutionContext at runtime. Other defaults are still merged into step.
+    """
     workflow_file = tmp_path / "partial_override.yaml"
     workflow_file.write_text("""
 name: partial_override_test
@@ -411,9 +408,12 @@ steps:
     assert step.model == "claude-opus-4"
     assert step.max_retries == 5
 
-    # Inherited fields
-    assert step.system_prompt == "Default"
+    # Inherited fields (non-system-prompt)
     assert step.output_format == "json"
+
+    # system_prompt flows through ExecutionContext at runtime
+    assert step.system_prompt is None
+    assert wf.defaults.system_prompt == "Default"
 
 
 def test_defaults_no_system_prompt(tmp_path):

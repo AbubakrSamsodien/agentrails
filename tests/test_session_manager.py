@@ -25,7 +25,7 @@ async def test_session_manager_start_session_basic(mock_claude_cli):
     result = await manager.start_session(prompt="test prompt")
 
     assert result.session_id is not None
-    assert result.raw_output.strip() == '{"result": "mocked"}'
+    assert result.raw_output.strip() == "mocked"
     assert result.parsed_output == {"result": "mocked"}
     assert result.exit_code == 0
 
@@ -403,3 +403,151 @@ sys.exit(0)
     # Version couldn't be parsed, so all flags should be False
     assert manager.has_flag("bare") is False
     assert manager.has_flag("permission_mode") is False
+
+
+@pytest.mark.asyncio
+async def test_session_manager_no_bare_flag(mock_claude_cli, tmp_path):
+    """Test --bare flag is NOT present for any sessions (breaks auth discovery)."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    manager = SessionManager(claude_path=str(mock_claude_cli))
+    await manager.start_session(prompt="test")
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    assert "--bare" not in args
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_session_manager_no_bare_flag_subagent(mock_claude_cli, tmp_path):
+    """Test --bare flag is NOT present for subagent sessions either."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    manager = SessionManager(claude_path=str(mock_claude_cli))
+    await manager.start_session(prompt="test", subagent="slack")
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    # --bare should NOT be present (breaks auth and MCP discovery)
+    assert "--bare" not in args
+    # --agent flag should NOT be used
+    assert "--agent" not in args
+    # Instead, the prompt should be prefixed with @'name (agent)' syntax
+    prompt_idx = args.index("-p") + 1
+    assert args[prompt_idx].startswith("@'slack (agent)'")
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_session_manager_subagent_uses_system_prompt(mock_claude_cli, tmp_path):
+    """Test subagents use --system-prompt (not --append-system-prompt).
+
+    Since we no longer use --agent flag, there's no agent persona to append to.
+    The system prompt fully replaces the default.
+    """
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    manager = SessionManager(claude_path=str(mock_claude_cli))
+    await manager.start_session(
+        prompt="test", subagent="slack", system_prompt="you are a slack expert"
+    )
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    assert "--system-prompt" in args
+    assert "--append-system-prompt" not in args
+    assert "you are a slack expert" in args
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_session_manager_regular_uses_system_prompt(mock_claude_cli, tmp_path):
+    """Test regular agents use --system-prompt (not --append-system-prompt)."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    manager = SessionManager(claude_path=str(mock_claude_cli))
+    await manager.start_session(prompt="test", system_prompt="you are helpful")
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    assert "--system-prompt" in args
+    assert "--append-system-prompt" not in args
+    assert "you are helpful" in args
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_session_manager_subagent_long_system_prompt_file(mock_claude_cli, tmp_path):
+    """Test subagents with long system prompts use --system-prompt-file."""
+    from agentrails.session_manager import SessionManager
+
+    manager = SessionManager(claude_path=str(mock_claude_cli))
+
+    # Long system prompt (> 4096 chars)
+    long_prompt = "x" * 5000
+
+    result = await manager.start_session(prompt="test", subagent="slack", system_prompt=long_prompt)
+
+    # Should succeed (temp file handling works)
+    assert result.exit_code == 0
+
+
+@pytest.mark.asyncio
+async def test_session_manager_subagent_prompt_prefix(mock_claude_cli, tmp_path):
+    """Test subagent prompt is prefixed with @'name (agent)' inline syntax."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    manager = SessionManager(claude_path=str(mock_claude_cli))
+    await manager.start_session(prompt="fetch messages from #general", subagent="slack")
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    prompt_idx = args.index("-p") + 1
+    assert args[prompt_idx] == "@'slack (agent)' fetch messages from #general"
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_session_manager_regular_no_prompt_prefix(mock_claude_cli, tmp_path):
+    """Test regular (non-subagent) sessions don't get prompt prefix."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    manager = SessionManager(claude_path=str(mock_claude_cli))
+    await manager.start_session(prompt="just a normal prompt")
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    prompt_idx = args.index("-p") + 1
+    assert args[prompt_idx] == "just a normal prompt"
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]

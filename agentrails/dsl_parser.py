@@ -34,6 +34,7 @@ class WorkflowDefaults:
     retry_delay_seconds: float = 5.0
     retry_backoff: str = "fixed"
     retry_on: list[str] = field(default_factory=lambda: ["error", "timeout"])
+    raw_system_prompt: bool = False
 
 
 @dataclass
@@ -116,6 +117,7 @@ def _parse_defaults(defaults_data: dict[str, Any]) -> WorkflowDefaults:
         retry_delay_seconds=defaults_data.get("retry_delay_seconds", 5.0),
         retry_backoff=defaults_data.get("retry_backoff", "fixed"),
         retry_on=defaults_data.get("retry_on", ["error", "timeout"]),
+        raw_system_prompt=defaults_data.get("raw_system_prompt", False),
     )
 
 
@@ -189,6 +191,8 @@ def _create_step(
         "retry_delay_seconds": step_data.get("retry_delay_seconds", defaults.retry_delay_seconds),
         "retry_backoff": step_data.get("retry_backoff", defaults.retry_backoff),
         "retry_on": step_data.get("retry_on", list(defaults.retry_on)),
+        "raw_system_prompt": step_data.get("raw_system_prompt", defaults.raw_system_prompt),
+        "as_output": step_data.get("as_output", False),
     }
 
     # Handle conditional step's special fields
@@ -204,6 +208,8 @@ def _create_step(
             else_=step_data.get("else", []),
             **base_kwargs,
         )
+
+    base_kwargs["condition"] = step_data.get("condition")
 
     # Handle parallel group
     if step_type == "parallel_group":
@@ -288,9 +294,9 @@ def _create_step(
                 )
             with open(prompt_file_path, encoding="utf-8") as f:
                 system_prompt = f.read()
-        elif system_prompt is None:
-            # Fall back to defaults.system_prompt
-            system_prompt = defaults.system_prompt
+        # Note: No fallback to defaults.system_prompt here
+        # The default flows through ExecutionContext.workflow_default_system_prompt
+        # for layered composition at runtime
 
         # Merge defaults for agent-specific fields
         permission_mode = step_data.get("permission_mode", defaults.permission_mode)

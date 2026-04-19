@@ -1,0 +1,92 @@
+name: slack_platform_updates
+
+# Workflow to check the #platform_team Slack channel for recent activity
+# Uses the slack subagent to fetch channel updates
+
+defaults:
+  permission_mode: bypassPermissions
+
+steps:
+  # Step 1: Use slack subagent to fetch recent messages from #platform_team
+  - id: fetch_slack_updates
+    type: agent
+    subagent: slack
+    prompt: |
+      Fetch the most recent messages from the #platform_team channel.
+      
+      Return a summary of:
+      1. Any announcements or important updates
+      2. Questions that were asked
+      3. Decisions that were made
+      4. Action items mentioned
+      
+      Focus on messages from the last 24 hours if possible.
+    output_format: json
+    output_schema:
+      type: object
+      properties:
+        channel: { type: string }
+        fetched_at: { type: string }
+        summary: { type: string }
+        announcements:
+          type: array
+          items: { type: string }
+        questions:
+          type: array
+          items: { type: string }
+        decisions:
+          type: array
+          items: { type: string }
+        action_items:
+          type: array
+          items:
+            type: object
+            properties:
+              description: { type: string }
+              owner: { type: string }
+            required: [description]
+
+  # Step 2: Format the updates as a readable report (only if parsing succeeded)
+  - id: format_report
+    type: agent
+    prompt: |
+      Create a formatted daily report from the Slack updates.
+      
+      Here's the data from #platform-team:
+      {{state.fetch_slack_updates.result | tojson}}
+      
+      Format this as a clear, readable report with sections for:
+      - Quick Summary (2-3 sentences)
+      - Key Announcements
+      - Open Questions
+      - Decisions Made
+      - Action Items (with owners if known)
+      
+      Use markdown formatting for readability.
+    depends_on: [fetch_slack_updates]
+    condition: "{{state.fetch_slack_updates.parse_error is not defined}}"
+    output_format: text
+    as_output: true  # Print this step's result to stdout
+
+  # Step 2b: Report parsing error if JSON parsing failed
+  - id: report_error
+    type: shell
+    script: |
+      echo "ERROR: Failed to parse Slack updates as JSON"
+      echo "Raw output: {{state.fetch_slack_updates.raw_result}}"
+    depends_on: [fetch_slack_updates]
+    condition: "{{state.fetch_slack_updates.parse_error is defined}}"
+    as_output: true
+
+  # Step 3: (Optional) Post the summary back to Slack
+  # Uncomment if you want to post the report back to a channel
+  # - id: post_summary
+  #   type: agent
+  #   subagent: slack
+  #   prompt: |
+  #     Post the following daily summary to the #platform_team channel:
+  #     
+  #     {{state.format_report.result}}
+  #     
+  #     Make sure the formatting is preserved and the message is clear.
+  #   depends_on: [format_report]
