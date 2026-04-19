@@ -75,7 +75,7 @@ class DisplayManager:
                 f"[bold]agentrails:[/bold] {self.workflow_name} (run: {self.run_id})"
             )
         else:
-            print(f"agentrails: {self.workflow_name} (run: {self.run_id})")
+            print(f"agentrails: {self.workflow_name} (run: {self.run_id})", file=sys.stderr)
 
     def step_started(self, step_id: str, step_num: int, total: int, step_type: str = "") -> None:
         """Called when a step starts executing."""
@@ -84,7 +84,7 @@ class DisplayManager:
         if self.interactive and self._interactive_ready:
             self._update_display()
         else:
-            print(f"[{step_num}/{total}] {step_id}: running...")
+            print(f"[{step_num}/{total}] {step_id}: running...", file=sys.stderr)
 
     def step_completed(self, step_id: str, step_num: int, total: int, duration: float) -> None:
         """Called when a step completes successfully."""
@@ -93,7 +93,7 @@ class DisplayManager:
         if self.interactive and self._interactive_ready:
             self._update_display()
         else:
-            print(f"[{step_num}/{total}] {step_id}: completed ({duration:.1f}s)")
+            print(f"[{step_num}/{total}] {step_id}: completed ({duration:.1f}s)", file=sys.stderr)
 
     def step_failed(
         self, step_id: str, step_num: int, total: int, duration: float, error: str
@@ -106,7 +106,10 @@ class DisplayManager:
         if self.interactive and self._interactive_ready:
             self._update_display()
         else:
-            print(f"[{step_num}/{total}] {step_id}: failed -- {error} ({duration:.1f}s)")
+            print(
+                f"[{step_num}/{total}] {step_id}: failed -- {error} ({duration:.1f}s)",
+                file=sys.stderr,
+            )
 
     def step_skipped(self, step_id: str, step_num: int, total: int) -> None:
         """Called when a step is skipped (condition evaluated to false)."""
@@ -115,7 +118,7 @@ class DisplayManager:
         if self.interactive and self._interactive_ready:
             self._update_display()
         else:
-            print(f"[{step_num}/{total}] {step_id}: skipped")
+            print(f"[{step_num}/{total}] {step_id}: skipped", file=sys.stderr)
 
     def workflow_completed(self, steps_completed: int, steps_failed: int, duration: float) -> None:
         """Called when the workflow completes."""
@@ -126,7 +129,10 @@ class DisplayManager:
             self._final_display(status, steps_completed, steps_failed, duration)
             self._live.stop()
         else:
-            print(f"agentrails: {status} ({steps_completed}/{total} steps, {duration:.1f}s)")
+            print(
+                f"agentrails: {status} ({steps_completed}/{total} steps, {duration:.1f}s)",
+                file=sys.stderr,
+            )
 
     def _get_status_symbol(self, status: str) -> str:
         """Get Unicode symbol for step status."""

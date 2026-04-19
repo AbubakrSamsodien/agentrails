@@ -93,6 +93,11 @@ class AgentStep(BaseStep):
         Returns:
             StepResult with agent output
         """
+        import json
+
+        from agentrails.prompt_composer import LAYER_SEPARATOR, compose_system_prompt
+        from agentrails.prompts import load_base_prompt
+
         # Render templates
         rendered_prompt = render_template(self.prompt, state.snapshot())
         rendered_system_prompt = None
@@ -102,13 +107,65 @@ class AgentStep(BaseStep):
         if self.subagent:
             rendered_subagent = render_template(self.subagent, state.snapshot())
 
+        # Build auto-injected context (Layer 4)
+        auto_context_parts = []
+
+        # Schema injection (RAIL-122)
+        if self.output_format in ("json", "toml"):
+            fmt_upper = self.output_format.upper()
+            fmt_lower = self.output_format.lower()
+            if self.output_schema:
+                schema_json = json.dumps(self.output_schema, indent=2)
+                schema_block = (
+                    f"# Required output format\n\n"
+                    f"Your response must be valid {fmt_upper} conforming "
+                    f"to this schema:\n\n"
+                    f"```{fmt_lower}\n{schema_json}\n```\n\n"
+                    f"Produce only the {fmt_upper} object. Do not include "
+                    f"any text before or after it."
+                )
+            else:
+                schema_block = (
+                    f"# Required output format\n\n"
+                    f"Your response must be valid {fmt_upper}. Produce only "
+                    f"the {fmt_upper} object.\n"
+                    f"Do not include any text before or after it."
+                )
+            auto_context_parts.append(schema_block)
+
+        # Pipeline context injection (RAIL-123)
+        completed_steps = context.completed_steps or set()
+        completed_list = ", ".join(sorted(completed_steps)) or "none"
+        depends_list = ", ".join(self.depends_on) or "nothing (first step)"
+        pipeline_block = (
+            f"# Pipeline context\n\n"
+            f"- Workflow: {context.workflow_name}\n"
+            f"- Current step: {self.id}\n"
+            f"- Steps completed: {completed_list}\n"
+            f"- This step depends on: {depends_list}"
+        )
+        auto_context_parts.append(pipeline_block)
+
+        # Combine auto-context parts
+        auto_context = LAYER_SEPARATOR.join(auto_context_parts) if auto_context_parts else None
+
+        # Compose system prompt from layers
+        base_prompt = load_base_prompt()
+        composed_system_prompt = compose_system_prompt(
+            base_prompt=base_prompt,
+            workflow_default_prompt=context.workflow_default_system_prompt,
+            step_prompt=rendered_system_prompt,
+            auto_context=auto_context,
+            raw_mode=self.raw_system_prompt,
+        )
+
         # Get session manager from context
         session_manager = context.session_manager
 
         try:
             result = await session_manager.start_session(
                 prompt=rendered_prompt,
-                system_prompt=rendered_system_prompt,
+                system_prompt=composed_system_prompt if composed_system_prompt else None,
                 subagent=rendered_subagent,
                 session_id=self.session_id,
                 name=self.name,

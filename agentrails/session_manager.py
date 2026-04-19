@@ -250,13 +250,15 @@ class SessionManager:
             # Build command
             cmd = [self.claude_path]
 
-            # Omit --bare when using subagent to allow subagent config loading
-            if not subagent:
-                cmd.append("--bare")
-
-            # Subagent (--agent flag)
-            if subagent:
-                cmd.extend(["--agent", subagent])
+            # NOTE: We intentionally do NOT use --bare.
+            # While --bare provides deterministic execution by stripping project
+            # config (CLAUDE.md, hooks, MCP, plugins), it also strips auth config
+            # discovery, causing "Not logged in" errors. Determinism is controlled
+            # instead via --system-prompt (replaces built-in prompt) and
+            # --permission-mode (prevents interactive approvals).
+            #
+            # For subagents, skipping --bare also preserves MCP server discovery
+            # needed for OAuth-based tools (Slack, Jira, GitLab).
 
             # Session ID (new or resume)
             if session_id:
@@ -290,6 +292,9 @@ class SessionManager:
                 cmd.extend(["--permission-mode", "bypassPermissions"])
 
             # System prompt
+            # Always use --system-prompt (not --append-system-prompt) since we no
+            # longer use --agent flag. Subagents are invoked via inline @'name (agent)'
+            # syntax in the prompt, so the system prompt replaces the default.
             temp_prompt_file = None
             if system_prompt:
                 if len(system_prompt) <= 4096:
@@ -309,8 +314,13 @@ class SessionManager:
             # Environment
             full_env = {**os.environ, **(env or {})}
 
-            # Add prompt as final argument
-            cmd.extend(["-p", prompt])
+            # Add prompt as final argument.
+            # For subagents, prepend the @'name (agent)' inline mention to the
+            # prompt so Claude delegates to the agent's persona and MCP tools.
+            effective_prompt = prompt
+            if subagent:
+                effective_prompt = f"@'{subagent} (agent)' {prompt}"
+            cmd.extend(["-p", effective_prompt])
 
             session_id = session_id or str(uuid4())
             start_time = asyncio.get_event_loop().time()
@@ -360,10 +370,18 @@ class SessionManager:
                 raw_output = stdout.decode()
 
                 # Parse JSON output if available
+                # When --output-format json is used, the CLI returns a JSON
+                # envelope: {"type":"result", "result":"<agent text>", ...}
+                # We extract the inner "result" field as raw_output so
+                # downstream OutputParser sees the agent's actual response,
+                # not the CLI metadata envelope.
                 parsed_output: dict[str, Any] = {}
                 if output_format == "json" and raw_output:
                     try:
                         parsed_output = json.loads(raw_output)
+                        # Extract agent's text response from CLI envelope
+                        if isinstance(parsed_output, dict) and "result" in parsed_output:
+                            raw_output = parsed_output["result"]
                     except json.JSONDecodeError:
                         logger.warning("Could not parse JSON output: %s", raw_output[:200])
 

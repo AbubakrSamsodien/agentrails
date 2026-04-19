@@ -20,6 +20,9 @@ class ExecutionContext:
     logger: Any  # logging.Logger
     session_manager: Any  # SessionManager
     state_store: Any  # StateStore
+    workflow_default_system_prompt: str | None = None
+    workflow_name: str = ""
+    completed_steps: set[str] | None = None
 
 
 @dataclass
@@ -53,6 +56,8 @@ class BaseStep(ABC):
     retry_delay_seconds: float
     retry_backoff: str
     retry_on: list[str]
+    raw_system_prompt: bool
+    as_output: bool
 
     def __init__(
         self,
@@ -68,6 +73,8 @@ class BaseStep(ABC):
         retry_delay_seconds: float = 5.0,
         retry_backoff: str = "fixed",
         retry_on: list[str] | None = None,
+        raw_system_prompt: bool = False,
+        as_output: bool = False,
     ):
         """Initialize a step.
 
@@ -84,6 +91,8 @@ class BaseStep(ABC):
             retry_delay_seconds: Initial delay between retries (seconds)
             retry_backoff: Backoff strategy: fixed, linear, exponential
             retry_on: Which failure types trigger retry: error, timeout
+            raw_system_prompt: If True, skip all framework prompt layers (escape hatch)
+            as_output: If True, print this step's raw_output to stdout on workflow completion
         """
         self.id = id
         self.type = type
@@ -97,6 +106,8 @@ class BaseStep(ABC):
         self.retry_delay_seconds = retry_delay_seconds
         self.retry_backoff = retry_backoff
         self.retry_on = retry_on or ["error", "timeout"]
+        self.raw_system_prompt = raw_system_prompt
+        self.as_output = as_output
 
     @abstractmethod
     async def execute(self, state: WorkflowState, context: ExecutionContext) -> StepResult:
@@ -129,6 +140,8 @@ class BaseStep(ABC):
             "retry_delay_seconds": self.retry_delay_seconds,
             "retry_backoff": self.retry_backoff,
             "retry_on": self.retry_on,
+            "raw_system_prompt": self.raw_system_prompt,
+            "as_output": self.as_output,
         }
 
     @classmethod
@@ -154,4 +167,6 @@ class BaseStep(ABC):
             retry_delay_seconds=data.get("retry_delay_seconds", 5.0),
             retry_backoff=data.get("retry_backoff", "fixed"),
             retry_on=data.get("retry_on", ["error", "timeout"]),
+            raw_system_prompt=data.get("raw_system_prompt", False),
+            as_output=data.get("as_output", False),
         )

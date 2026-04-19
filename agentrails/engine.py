@@ -28,6 +28,7 @@ class WorkflowResult:
     final_state: WorkflowState
     step_results: dict[str, StepResult]
     duration_seconds: float
+    output_result: StepResult | None = None  # Step result marked with as_output=true
     error: str | None = None
 
 
@@ -216,6 +217,13 @@ class WorkflowRunner:
             steps_pending=total_steps - len(completed),
         )
 
+        # Find step marked with as_output=true
+        output_result = None
+        for step in workflow.steps:
+            if step.as_output and step.id in step_results:
+                output_result = step_results[step.id]
+                break
+
         return WorkflowResult(
             workflow_id=workflow_id,
             run_id=run_id,
@@ -223,6 +231,7 @@ class WorkflowRunner:
             final_state=state,
             step_results=step_results,
             duration_seconds=duration,
+            output_result=output_result,
             error=workflow_error,
         )
 
@@ -400,6 +409,13 @@ class WorkflowRunner:
             steps_pending=total_steps - len(completed),
         )
 
+        # Find step marked with as_output=true
+        output_result = None
+        for step in workflow.steps:
+            if step.as_output and step.id in step_results:
+                output_result = step_results[step.id]
+                break
+
         return WorkflowResult(
             workflow_id=workflow_id,
             run_id=run_id,
@@ -407,6 +423,7 @@ class WorkflowRunner:
             final_state=state,
             step_results=step_results,
             duration_seconds=duration,
+            output_result=output_result,
             error=workflow_error,
         )
 
@@ -552,6 +569,9 @@ class WorkflowRunner:
                                 logger=logger,
                                 session_manager=session_manager,
                                 state_store=store,
+                                workflow_default_system_prompt=workflow.defaults.system_prompt,
+                                workflow_name=workflow.name,
+                                completed_steps=set(completed),
                             )
 
                             # Execute step

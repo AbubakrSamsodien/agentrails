@@ -465,3 +465,374 @@ def test_agent_step_serialize_deserialize_roundtrip():
     assert restored.subagent == original.subagent
     assert restored.name == original.name
     assert restored.model == original.model
+
+
+@pytest.mark.asyncio
+async def test_agent_step_schema_injection_json(tmp_path, mock_claude_cli):
+    """Test that JSON schema is auto-injected into system prompt."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    import os
+
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    step = AgentStep(
+        id="plan",
+        prompt="Create a plan",
+        output_format="json",
+        output_schema={"type": "object", "properties": {"title": {"type": "string"}}},
+    )
+
+    from agentrails.state import WorkflowState
+    from agentrails.steps.base import ExecutionContext
+
+    state = WorkflowState({})
+    context = ExecutionContext(
+        workflow_id="wf123",
+        run_id="run456",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=SessionManager(claude_path=str(mock_claude_cli)),
+        state_store=None,
+        workflow_default_system_prompt=None,
+        workflow_name="test_workflow",
+        completed_steps=set(),
+    )
+
+    await step.execute(state, context)
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    assert "--system-prompt" in args
+    system_prompt = args[args.index("--system-prompt") + 1]
+
+    # Check schema injection
+    assert "# Required output format" in system_prompt
+    assert "valid JSON conforming to this schema" in system_prompt
+    assert '"title"' in system_prompt
+    assert '"type": "string"' in system_prompt
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_schema_injection_toml(tmp_path, mock_claude_cli):
+    """Test that TOML schema is auto-injected into system prompt."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    import os
+
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    step = AgentStep(
+        id="config",
+        prompt="Create config",
+        output_format="toml",
+        output_schema={"type": "object"},
+    )
+
+    from agentrails.state import WorkflowState
+    from agentrails.steps.base import ExecutionContext
+
+    state = WorkflowState({})
+    context = ExecutionContext(
+        workflow_id="wf123",
+        run_id="run456",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=SessionManager(claude_path=str(mock_claude_cli)),
+        state_store=None,
+        workflow_default_system_prompt=None,
+        workflow_name="test_workflow",
+        completed_steps=set(),
+    )
+
+    await step.execute(state, context)
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    system_prompt = args[args.index("--system-prompt") + 1]
+
+    assert "# Required output format" in system_prompt
+    assert "valid TOML conforming to this schema" in system_prompt
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_no_schema_format_only(tmp_path, mock_claude_cli):
+    """Test format-only instruction when no schema defined."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    import os
+
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    step = AgentStep(
+        id="simple",
+        prompt="Do something",
+        output_format="json",
+        output_schema=None,
+    )
+
+    from agentrails.state import WorkflowState
+    from agentrails.steps.base import ExecutionContext
+
+    state = WorkflowState({})
+    context = ExecutionContext(
+        workflow_id="wf123",
+        run_id="run456",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=SessionManager(claude_path=str(mock_claude_cli)),
+        state_store=None,
+        workflow_name="test_workflow",
+        completed_steps=set(),
+    )
+
+    await step.execute(state, context)
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    system_prompt = args[args.index("--system-prompt") + 1]
+
+    assert "# Required output format" in system_prompt
+    assert "valid JSON" in system_prompt
+    assert "conforming to this schema" not in system_prompt
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_text_format_no_injection(tmp_path, mock_claude_cli):
+    """Test no schema injection for text output format."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    import os
+
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    step = AgentStep(
+        id="text_step",
+        prompt="Write text",
+        output_format="text",
+    )
+
+    from agentrails.state import WorkflowState
+    from agentrails.steps.base import ExecutionContext
+
+    state = WorkflowState({})
+    context = ExecutionContext(
+        workflow_id="wf123",
+        run_id="run456",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=SessionManager(claude_path=str(mock_claude_cli)),
+        state_store=None,
+        workflow_name="test_workflow",
+        completed_steps=set(),
+    )
+
+    await step.execute(state, context)
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    system_prompt = args[args.index("--system-prompt") + 1]
+
+    assert "# Required output format" not in system_prompt
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_pipeline_context_first_step(tmp_path, mock_claude_cli):
+    """Test pipeline context for first step (no dependencies)."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    import os
+
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    step = AgentStep(
+        id="first",
+        prompt="Start",
+        depends_on=[],
+    )
+
+    from agentrails.state import WorkflowState
+    from agentrails.steps.base import ExecutionContext
+
+    state = WorkflowState({})
+    context = ExecutionContext(
+        workflow_id="wf123",
+        run_id="run456",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=SessionManager(claude_path=str(mock_claude_cli)),
+        state_store=None,
+        workflow_name="my_workflow",
+        completed_steps=set(),
+    )
+
+    await step.execute(state, context)
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    system_prompt = args[args.index("--system-prompt") + 1]
+
+    assert "# Pipeline context" in system_prompt
+    assert "- Workflow: my_workflow" in system_prompt
+    assert "- Current step: first" in system_prompt
+    assert "- Steps completed: none" in system_prompt
+    assert "- This step depends on: nothing (first step)" in system_prompt
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_pipeline_context_with_deps(tmp_path, mock_claude_cli):
+    """Test pipeline context with completed steps and dependencies."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    import os
+
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    step = AgentStep(
+        id="deploy",
+        prompt="Deploy",
+        depends_on=["build", "test"],
+    )
+
+    from agentrails.state import WorkflowState
+    from agentrails.steps.base import ExecutionContext
+
+    state = WorkflowState({})
+    context = ExecutionContext(
+        workflow_id="wf123",
+        run_id="run456",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=SessionManager(claude_path=str(mock_claude_cli)),
+        state_store=None,
+        workflow_name="ci_cd",
+        completed_steps={"build", "test", "lint"},
+    )
+
+    await step.execute(state, context)
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    system_prompt = args[args.index("--system-prompt") + 1]
+
+    assert "- Workflow: ci_cd" in system_prompt
+    assert "- Current step: deploy" in system_prompt
+    assert "- Steps completed: build, lint, test" in system_prompt  # sorted
+    assert "- This step depends on: build, test" in system_prompt
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_raw_system_prompt_only(tmp_path, mock_claude_cli):
+    """Test raw_system_prompt bypasses all framework layers."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    import os
+
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    step = AgentStep(
+        id="custom",
+        prompt="Custom task",
+        system_prompt="You are a custom agent.",
+        raw_system_prompt=True,
+        output_format="json",
+        output_schema={"type": "object"},
+    )
+
+    from agentrails.state import WorkflowState
+    from agentrails.steps.base import ExecutionContext
+
+    state = WorkflowState({})
+    context = ExecutionContext(
+        workflow_id="wf123",
+        run_id="run456",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=SessionManager(claude_path=str(mock_claude_cli)),
+        state_store=None,
+        workflow_default_system_prompt="Default",
+        workflow_name="workflow",
+        completed_steps=set(),
+    )
+
+    await step.execute(state, context)
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    system_prompt = args[args.index("--system-prompt") + 1]
+
+    # Only the step's system prompt should be present
+    assert system_prompt == "You are a custom agent."
+    assert "Tools and file operations" not in system_prompt  # No base prompt
+    assert "Default" not in system_prompt  # No workflow default
+    assert "# Required output format" not in system_prompt  # No schema injection
+    assert "# Pipeline context" not in system_prompt  # No pipeline context
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]
+
+
+@pytest.mark.asyncio
+async def test_agent_step_raw_system_prompt_no_prompt(tmp_path, mock_claude_cli):
+    """Test raw_system_prompt with no system_prompt results in empty prompt."""
+    from agentrails.session_manager import SessionManager
+
+    args_file = tmp_path / "args.json"
+    import os
+
+    os.environ["MOCK_CLAUDE_ARGS_FILE"] = str(args_file)
+
+    step = AgentStep(
+        id="bare",
+        prompt="Task",
+        raw_system_prompt=True,
+        system_prompt=None,
+    )
+
+    from agentrails.state import WorkflowState
+    from agentrails.steps.base import ExecutionContext
+
+    state = WorkflowState({})
+    context = ExecutionContext(
+        workflow_id="wf123",
+        run_id="run456",
+        working_directory=tmp_path,
+        logger=None,
+        session_manager=SessionManager(claude_path=str(mock_claude_cli)),
+        state_store=None,
+    )
+
+    await step.execute(state, context)
+
+    import json
+
+    args = json.loads(args_file.read_text())
+    # --system-prompt should not be present if prompt is empty
+    assert "--system-prompt" not in args
+
+    del os.environ["MOCK_CLAUDE_ARGS_FILE"]

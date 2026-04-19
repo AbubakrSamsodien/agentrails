@@ -70,6 +70,10 @@ def run(
         runner = WorkflowRunner(config=config, working_directory=workdir)
         result = asyncio.run(runner.run(workflow, state_dict))
 
+        # Print output from step marked with as_output=true (to stdout)
+        if result.output_result and result.output_result.raw_output:
+            print(result.output_result.raw_output)
+
         # Exit with appropriate code
         if result.status == "completed":
             sys.exit(0)
