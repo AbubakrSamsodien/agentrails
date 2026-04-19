@@ -80,7 +80,10 @@ name: json_output_test
 steps:
   - id: json_step
     type: shell
-    script: 'echo "{\"key\": \"value\", \"number\": 42}"'
+    script: |
+      cat <<'EOF'
+      {"key": "value", "number": 42}
+      EOF
     output_format: json
 """
 
@@ -117,7 +120,11 @@ name: toml_output_test
 steps:
   - id: toml_step
     type: shell
-    script: 'echo -e "title = \\"Test\\"\\ncount = 10"'
+    script: |
+      cat <<'EOF'
+      title = "Test"
+      count = 10
+      EOF
     output_format: toml
 """
 
